@@ -75,12 +75,14 @@ jobs:
           set -euo pipefail
           out="$RUNNER_TEMP/after-upgrade.txt"
           # The question is asked only on a console (canAsk, BV-52): give the run a
-          # terminal with script(1), whose arguments differ on macOS and Linux.
+          # terminal with script(1), whose arguments differ on macOS and Linux. The
+          # input stays open after the «y» so script(1) never sends the end of
+          # input (^D) before the program reads the answer.
           cmd="HOME='$H' rosmarops run --lang en"
           if [ "$RUNNER_OS" = macOS ]; then
-            (sleep 3; printf 'y\n') | script -q /dev/null sh -c "$cmd" 2>&1 | tr -d '\r' | tee "$out"
+            (sleep 3; printf 'y\n'; sleep 10) | script -q /dev/null sh -c "$cmd" 2>&1 | tr -d '\r' | tee "$out"
           else
-            (sleep 3; printf 'y\n') | script -qec "$cmd" /dev/null 2>&1 | tr -d '\r' | tee "$out"
+            (sleep 3; printf 'y\n'; sleep 10) | script -qec "$cmd" /dev/null 2>&1 | tr -d '\r' | tee "$out"
           fi
           grep -qF "RosmarOps has changed since the last run." "$out" || { echo "no integrity prompt after the upgrade"; exit 1; }
           test -s "$H/.rosmarops/reports/report.en.html" || { echo "no report"; exit 1; }
