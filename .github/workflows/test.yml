@@ -1,0 +1,90 @@
+# BV-167 §3: the formula on macOS (Apple silicon) and Linux (x86-64): build
+# from source, brew test, no quarantine attribute, a real run with a report,
+# the weekly-review command's path, and the integrity check after an upgrade.
+# Read-only for every other repository: no tokens, no writes outside this run.
+name: test
+on:
+  push:
+    branches: [main, master, 'bv-*']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  formula:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      HOMEBREW_NO_INSTALL_CLEANUP: "1"
+      HOMEBREW_NO_ENV_HINTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Homebrew on the PATH
+        shell: bash
+        run: |
+          if ! command -v brew >/dev/null; then
+            echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
+          fi
+      - name: Local tap with this branch's formula
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew tap-new --no-git qtorb/rosmarops
+          TAP="$(brew --repository)/Library/Taps/qtorb/homebrew-rosmarops"
+          echo "TAP=$TAP" >> "$GITHUB_ENV"
+          # The previous release first, to check the integrity prompt after an upgrade.
+          sed -e 's|v0.11.7.tar.gz|v0.11.6.tar.gz|' \
+              -e 's|2407cc05ecd1e90e804cce189d3b9d55f7a26ac7e6c13e098c6ae92b2f7b3a25|684735ae9d6a25f55c68d4001dfbd5b2f393010c4499a63e05a0f521d5165e45|' \
+              Formula/rosmarops.rb > "$TAP/Formula/rosmarops.rb"
+      - name: Install the previous release (0.11.6) and run it once
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install --build-from-source qtorb/rosmarops/rosmarops
+          H="$RUNNER_TEMP/home"; mkdir -p "$H/projects/app"
+          git -C "$H/projects/app" init -q
+          echo "H=$H" >> "$GITHUB_ENV"
+          HOME="$H" rosmarops init --repos-under "$H/projects"
+          HOME="$H" rosmarops baseline
+          HOME="$H" rosmarops run --lang en </dev/null
+      - name: brew upgrade to this formula (build from source) and brew test
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Formula/rosmarops.rb "$TAP/Formula/rosmarops.rb"
+          brew upgrade --build-from-source qtorb/rosmarops/rosmarops 2>&1 | tee "$RUNNER_TEMP/brew-install.txt"
+          brew test qtorb/rosmarops/rosmarops 2>&1 | tee "$RUNNER_TEMP/brew-test.txt"
+          rosmarops --version
+      - name: No quarantine attribute (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in "$(brew --prefix)/bin/rosmarops" "$(brew --prefix rosmarops)/bin/rosmarops"; do
+            xattr -l "$f"
+            if xattr -p com.apple.quarantine "$f" 2>/dev/null; then
+              echo "com.apple.quarantine on $f"; exit 1
+            fi
+          done
+      - name: After the upgrade the integrity check asks to confirm, then the report
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/after-upgrade.txt"
+          printf 'y\n' | HOME="$H" rosmarops run --lang en 2>&1 | tee "$out"
+          grep -qF "RosmarOps has changed since the last run." "$out" || { echo "no integrity prompt after the upgrade"; exit 1; }
+          test -s "$H/.rosmarops/reports/report.en.html" || { echo "no report"; exit 1; }
+      - name: Weekly-review command points to the stable Homebrew path
+        shell: bash
+        run: |
+          set -euo pipefail
+          R="$H/.rosmarops/reports/report.en.html"
+          stable="$(brew --prefix)/bin/rosmarops"
+          echo "stable path: $stable"
+          grep -oE '[^ "<>]*/rosmarops/[0-9][^ "<>]*/bin/rosmarops|[^ "<>]*/bin/rosmarops' "$R" | sort -u || true
+          if grep -q "/Cellar/rosmarops/" "$R"; then
+            echo "the report's weekly-review command points into the Cellar"; exit 1
+          fi
