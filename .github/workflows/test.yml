@@ -36,10 +36,10 @@ jobs:
           TAP="$(brew --repository)/Library/Taps/qtorb/homebrew-rosmarops"
           echo "TAP=$TAP" >> "$GITHUB_ENV"
           # The previous release first, to check the integrity prompt after an upgrade.
-          sed -e 's|v0.12.0.tar.gz|v0.11.7.tar.gz|' \
-              -e 's|4a9445e9c826979640e94b324a9a8bb6efd4af1a566551aba28ac2fd29aa25eb|2407cc05ecd1e90e804cce189d3b9d55f7a26ac7e6c13e098c6ae92b2f7b3a25|' \
+          sed -e 's|v0.12.1.tar.gz|v0.12.0.tar.gz|' \
+              -e 's|e13c7f265ae188ce6f0c53531f474c37cf5cbec7ce95d2141319a18137ea4e6b|4a9445e9c826979640e94b324a9a8bb6efd4af1a566551aba28ac2fd29aa25eb|' \
               Formula/rosmarops.rb > "$TAP/Formula/rosmarops.rb"
-      - name: Install the previous release (0.11.7) and run it once
+      - name: Install the previous release (0.12.0) and run it once
         shell: bash
         run: |
           set -euo pipefail
