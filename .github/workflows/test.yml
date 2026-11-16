@@ -36,10 +36,10 @@ jobs:
           TAP="$(brew --repository)/Library/Taps/qtorb/homebrew-rosmarops"
           echo "TAP=$TAP" >> "$GITHUB_ENV"
           # The previous release first, to check the integrity prompt after an upgrade.
-          sed -e 's|v0.12.0.tar.gz|v0.11.7.tar.gz|' \
-              -e 's|4a9445e9c826979640e94b324a9a8bb6efd4af1a566551aba28ac2fd29aa25eb|2407cc05ecd1e90e804cce189d3b9d55f7a26ac7e6c13e098c6ae92b2f7b3a25|' \
+          sed -e 's|v0.12.1.tar.gz|v0.12.0.tar.gz|' \
+              -e 's|e13c7f265ae188ce6f0c53531f474c37cf5cbec7ce95d2141319a18137ea4e6b|4a9445e9c826979640e94b324a9a8bb6efd4af1a566551aba28ac2fd29aa25eb|' \
               Formula/rosmarops.rb > "$TAP/Formula/rosmarops.rb"
-      - name: Install the previous release (0.11.7) and run it once
+      - name: Install the previous release (0.12.0) and run it once
         shell: bash
         run: |
           set -euo pipefail
@@ -75,12 +75,14 @@ jobs:
           set -euo pipefail
           out="$RUNNER_TEMP/after-upgrade.txt"
           # The question is asked only on a console (canAsk, BV-52): give the run a
-          # terminal with script(1), whose arguments differ on macOS and Linux.
+          # terminal with script(1), whose arguments differ on macOS and Linux. The
+          # input stays open after the «y» so script(1) never sends the end of
+          # input (^D) before the program reads the answer.
           cmd="HOME='$H' rosmarops run --lang en"
           if [ "$RUNNER_OS" = macOS ]; then
-            (sleep 3; printf 'y\n') | script -q /dev/null sh -c "$cmd" 2>&1 | tr -d '\r' | tee "$out"
+            (sleep 3; printf 'y\n'; sleep 10) | script -q /dev/null sh -c "$cmd" 2>&1 | tr -d '\r' | tee "$out"
           else
-            (sleep 3; printf 'y\n') | script -qec "$cmd" /dev/null 2>&1 | tr -d '\r' | tee "$out"
+            (sleep 3; printf 'y\n'; sleep 10) | script -qec "$cmd" /dev/null 2>&1 | tr -d '\r' | tee "$out"
           fi
           grep -qF "RosmarOps has changed since the last run." "$out" || { echo "no integrity prompt after the upgrade"; exit 1; }
           test -s "$H/.rosmarops/reports/report.en.html" || { echo "no report"; exit 1; }
