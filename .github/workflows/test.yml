@@ -36,10 +36,10 @@ jobs:
           TAP="$(brew --repository)/Library/Taps/qtorb/homebrew-rosmarops"
           echo "TAP=$TAP" >> "$GITHUB_ENV"
           # The previous release first, to check the integrity prompt after an upgrade.
-          sed -e 's|v0.14.0.tar.gz|v0.13.0.tar.gz|' \
-              -e 's|e47948de127ef27631d397330a8690967d99274f815929e758a3412d425e2630|395ebee7a23733249dd99cf633015b7146f19c37baceca66ee449c7abc2fa7ed|' \
+          sed -e 's|v0.15.0.tar.gz|v0.14.0.tar.gz|' \
+              -e 's|ad9a456968ba0b94550fc7ebc76450adc44fe93af32add9161ae554013e86906|e47948de127ef27631d397330a8690967d99274f815929e758a3412d425e2630|' \
               Formula/rosmarops.rb > "$TAP/Formula/rosmarops.rb"
-      - name: Install the previous release (0.13.0) and run it once
+      - name: Install the previous release (0.14.0) and run it once
         shell: bash
         run: |
           set -euo pipefail
@@ -71,6 +71,7 @@ jobs:
           done
       - name: After the upgrade the integrity check asks to confirm, then the report
         shell: bash
+        timeout-minutes: 5
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/after-upgrade.txt"
@@ -78,13 +79,19 @@ jobs:
           # terminal with script(1), whose arguments differ on macOS and Linux. The
           # input stays open after the «y» so script(1) never sends the end of
           # input (^D) before the program reads the answer.
+          # With a console, the run asks three things, each read as its own line:
+          # the integrity confirmation («y»), whether Grok Bot is used («0», «I
+          # don't know») and, since 0.15.0, usage statistics («n», so this job
+          # never sends any).
           cmd="HOME='$H' rosmarops run --lang en"
+          answers() { sleep 3; printf 'y\n'; sleep 1; printf '0\n'; sleep 1; printf 'n\n'; sleep 10; }
           if [ "$RUNNER_OS" = macOS ]; then
-            (sleep 3; printf 'y\n'; sleep 10) | script -q /dev/null sh -c "$cmd" 2>&1 | tr -d '\r' | tee "$out"
+            answers | script -q /dev/null sh -c "$cmd" 2>&1 | tr -d '\r' | tee "$out"
           else
-            (sleep 3; printf 'y\n'; sleep 10) | script -qec "$cmd" /dev/null 2>&1 | tr -d '\r' | tee "$out"
+            answers | script -qec "$cmd" /dev/null 2>&1 | tr -d '\r' | tee "$out"
           fi
           grep -qF "RosmarOps has changed since the last run." "$out" || { echo "no integrity prompt after the upgrade"; exit 1; }
+          grep -qF "Usage statistics: off." "$out" || { echo "usage statistics not answered no"; exit 1; }
           test -s "$H/.rosmarops/reports/report.en.html" || { echo "no report"; exit 1; }
       - name: Weekly-review command points to the stable Homebrew path
         shell: bash
