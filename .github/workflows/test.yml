@@ -36,10 +36,10 @@ jobs:
           TAP="$(brew --repository)/Library/Taps/qtorb/homebrew-rosmarops"
           echo "TAP=$TAP" >> "$GITHUB_ENV"
           # The previous release first, to check the integrity prompt after an upgrade.
-          sed -e 's|v0.15.0.tar.gz|v0.14.0.tar.gz|' \
-              -e 's|ad9a456968ba0b94550fc7ebc76450adc44fe93af32add9161ae554013e86906|e47948de127ef27631d397330a8690967d99274f815929e758a3412d425e2630|' \
+          sed -e 's|v0.16.0.tar.gz|v0.15.0.tar.gz|' \
+              -e 's|80c00b3ea5d488b0a1d31888d93d7de1d3f1299da1aa4a59d04bb324e18344bb|ad9a456968ba0b94550fc7ebc76450adc44fe93af32add9161ae554013e86906|' \
               Formula/rosmarops.rb > "$TAP/Formula/rosmarops.rb"
-      - name: Install the previous release (0.14.0) and run it once
+      - name: Install the previous release (0.15.0) and run it once
         shell: bash
         run: |
           set -euo pipefail
@@ -92,12 +92,18 @@ jobs:
           fi
           grep -qF "RosmarOps has changed since the last run." "$out" || { echo "no integrity prompt after the upgrade"; exit 1; }
           grep -qF "Usage statistics: off." "$out" || { echo "usage statistics not answered no"; exit 1; }
-          test -s "$H/.rosmarops/reports/report.en.html" || { echo "no report"; exit 1; }
+          # Since 0.16.0 the reports are in ~/RosmarOps on Linux (moved once from
+          # ~/.rosmarops/reports); on macOS they stay in ~/.rosmarops/reports.
+          R=""
+          for d in "$H/RosmarOps" "$H/.rosmarops/reports"; do
+            if [ -s "$d/report.en.html" ]; then R="$d/report.en.html"; break; fi
+          done
+          test -n "$R" || { echo "no report"; exit 1; }
+          echo "R=$R" >> "$GITHUB_ENV"
       - name: Weekly-review command points to the stable Homebrew path
         shell: bash
         run: |
           set -euo pipefail
-          R="$H/.rosmarops/reports/report.en.html"
           stable="$(brew --prefix)/bin/rosmarops"
           echo "stable path: $stable"
           grep -oE '[^ "<>]*/rosmarops/[0-9][^ "<>]*/bin/rosmarops|[^ "<>]*/bin/rosmarops' "$R" | sort -u || true
