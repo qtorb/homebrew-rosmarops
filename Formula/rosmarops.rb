@@ -1,8 +1,8 @@
 class Rosmarops < Formula
   desc "See what your AI coding agents can reach on your computer, and how one agent can change another"
   homepage "https://github.com/qtorb/rosmarops"
-  url "https://github.com/qtorb/rosmarops/archive/refs/tags/v0.19.0.tar.gz"
-  sha256 "9952bfa658df6770db9bb2a5d49c3d74c8e5e5665f4f544aaf368fdbb598fa35"
+  url "https://github.com/qtorb/rosmarops/archive/refs/tags/v0.20.0.tar.gz"
+  sha256 "885bc52c6e770b5592d99f90b3ae1a27e073e117dd330c2b8909c830f688e025"
   license "AGPL-3.0-only"
 
   depends_on "go" => :build
